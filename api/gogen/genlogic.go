@@ -73,7 +73,7 @@ func genLogicByRoute(dir, rootPkg string, cfg *config.Config, group spec.Group, 
 			"request":      requestString,
 			"hasDoc":       len(route.JoinedDoc()) > 0,
 			"doc":          getDoc(route.JoinedDoc()),
-			"logicHandler": genLogicHandle(logicHandle[logic]),
+			"logicHandle":  genLogicHandle(logicHandle[logic]),
 		},
 	})
 }
@@ -177,7 +177,7 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 				case "post":
 					logicModelInterface[logicName] = spec.LogicHandle{
 						Model:    model,
-						Function: "Create",
+						Function: "Insert",
 						Params:   "l.ctx",
 						Result:   "_,err",
 						IsModel:  true,
@@ -185,7 +185,7 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 				case "put":
 					logicModelInterface[logicName] = spec.LogicHandle{
 						Model:    model,
-						Function: "Create",
+						Function: "Update",
 						Params:   "l.ctx",
 						Result:   "_,err",
 						IsModel:  true,
@@ -193,7 +193,7 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 				case "delete":
 					logicModelInterface[logicName] = spec.LogicHandle{
 						Model:    model,
-						Function: "Create",
+						Function: "Delete",
 						Params:   "l.ctx,req.id",
 						Result:   "_,err",
 						IsModel:  false,

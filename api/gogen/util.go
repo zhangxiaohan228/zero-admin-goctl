@@ -196,9 +196,9 @@ func getModel(api *spec.ApiSpec) string {
 		if len(model) > 0 {
 			for _, item := range strings.Split(model, ",") {
 				result.Add(strings.TrimSpace(item))
+				return result.KeysStr()[0]
 			}
 		}
 	}
-
-	return result.KeysStr()[0]
+	return ""
 }

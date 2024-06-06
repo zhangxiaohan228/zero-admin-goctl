@@ -21,7 +21,7 @@ func New{{.logic}}(ctx context.Context, svcCtx *svc.ServiceContext) *{{.logic}} 
 
 func (l *{{.logic}}) {{.function}}({{.request}}) {{.responseType}} {
 
-	{{.logicHandler}}
+	{{.logicHandle}}
 
 	{{.returnString}}
 }
