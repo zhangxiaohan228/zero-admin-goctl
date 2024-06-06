@@ -166,7 +166,7 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 			logicName := getLogicName(r)
 			if r.Path == "/" {
 				switch r.Method {
-				case "GET":
+				case "get":
 					logicModelInterface[logicName] = spec.LogicHandle{
 						Model:    model,
 						Function: "FindOne",
@@ -174,7 +174,7 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 						Result:   "resp,err",
 						IsModel:  false,
 					}
-				case "POST":
+				case "post":
 					logicModelInterface[logicName] = spec.LogicHandle{
 						Model:    model,
 						Function: "Create",
@@ -182,7 +182,7 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 						Result:   "_,err",
 						IsModel:  true,
 					}
-				case "PUT":
+				case "put":
 					logicModelInterface[logicName] = spec.LogicHandle{
 						Model:    model,
 						Function: "Create",
@@ -190,7 +190,7 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 						Result:   "_,err",
 						IsModel:  true,
 					}
-				case "DELETE":
+				case "delete":
 					logicModelInterface[logicName] = spec.LogicHandle{
 						Model:    model,
 						Function: "Create",
