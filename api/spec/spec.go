@@ -148,10 +148,11 @@ type (
 	}
 
 	LogicHandle struct {
-		Model    string // Model名称
-		Result   string // Model接口返回值
-		Function string // Model接口函数名称
-		Params   string // Model接口参数
-		IsModel  bool   // 是否为model结构体
+		Model         string // Model名称
+		Result        string // Model接口返回值
+		Function      string // Model接口函数名称
+		Params        string // Model接口参数
+		ReqIsModel    bool   // 参数是否为model结构体
+		ResultIsModel bool   // 结果是否为model结构体
 	}
 )

@@ -17,6 +17,23 @@ import (
 //go:embed logic.tpl
 var logicTemplate string
 
+var (
+	genLogicFunc = map[string]string{
+		"/list": "FindList",
+		"/:id":  "FindOne",
+	}
+	genLogicFuncParam = map[string]string{
+		"/list": "l.ctx,\"*\",nil",
+		"/:id":  "l.ctx,req.Id",
+	}
+	// 表示响应值是否需要经过结构体赋值
+	genLogicFuncResult = map[string]bool{
+		"FindList":         true,
+		"FindListWithPage": true,
+		"FindOne":          false,
+	}
+)
+
 func genLogic(dir, rootPkg string, cfg *config.Config, api *spec.ApiSpec) error {
 
 	logicHandle := newLogicHandlerByMethod(getModel(api), api.Service.Groups)
@@ -73,7 +90,7 @@ func genLogicByRoute(dir, rootPkg string, cfg *config.Config, group spec.Group, 
 			"request":      requestString,
 			"hasDoc":       len(route.JoinedDoc()) > 0,
 			"doc":          getDoc(route.JoinedDoc()),
-			"logicHandle":  genLogicHandle(logicHandle[logic]),
+			"logicHandle":  genLogicHandle(logicHandle[logic], responseString),
 		},
 	})
 }
@@ -140,64 +157,107 @@ func shallImportTypesPackage(route spec.Route) bool {
 	return true
 }
 
-func genLogicHandle(logicHandle spec.LogicHandle) string {
+func genLogicHandle(logicHandle spec.LogicHandle, responseString string) string {
+
+	if logicHandle.Model == "" {
+		return ""
+	}
 
 	var handles []string
 
 	modelStruct := strings.Title(logicHandle.Model) + "Model"
-	if logicHandle.IsModel {
+	if logicHandle.ReqIsModel {
 		handles = append(handles, fmt.Sprintf("var data %s.%s", logicHandle.Model, modelStruct))
 		handles = append(handles, "copier.Copy(&data, &req)"+"\n")
 		handles = append(handles, fmt.Sprintf("%s = l.svcCtx.Models.%s.%s(l.ctx,data)", logicHandle.Result, modelStruct, logicHandle.Function))
 	} else {
 		handles = append(handles, fmt.Sprintf("%s = l.svcCtx.Models.%s.%s(%s)", logicHandle.Result, modelStruct, logicHandle.Function, logicHandle.Params))
 	}
-	handles = append(handles, fmt.Sprintf("if %s != nil{\n\t\treturn nil,err\n\t}", logicHandle.Result))
+	handles = append(handles, fmt.Sprintf("if err != nil{\n\t\treturn nil,err\n\t}"))
+
+	if logicHandle.ResultIsModel {
+		// 分离出响应结构体名称
+		parts := strings.SplitN(responseString, "*", 2)
+		typeName := strings.SplitN(parts[1], ", ", 2)[0]
+		handles = append(handles, fmt.Sprintf("resp = &%s{}", typeName))
+
+		// 需要复制结构体
+		if genLogicFuncResult[logicHandle.Function] {
+			// 截取类型内部结构体名称
+			startIndex := strings.LastIndex(typeName, "List")
+			lastIndex := strings.LastIndex(typeName, "Response")
+			typeInfoName := typeName[startIndex+4 : lastIndex]
+
+			handles = append(handles, fmt.Sprintf("var data []*types.%s", typeInfoName+"List"))
+			handles = append(handles, "copier.Copy(&data, &result)"+"\n")
+			handles = append(handles, "resp.List = data")
+		} else {
+			handles = append(handles, "copier.Copy(&resp, &result)"+"\n")
+		}
+	}
 
 	return strings.Join(handles, "\n\t")
 }
 
 func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]spec.LogicHandle {
 
+	if model == "" {
+		return nil
+	}
+
 	logicModelInterface := make(map[string]spec.LogicHandle, 0)
 
 	for _, g := range apiGroups {
 		for _, r := range g.Routes {
+			if r.Path != "/" {
+				// 判断是否为需要生成的路由
+				if _, ok := genLogicFunc[r.Path]; !ok {
+					continue
+				}
+			}
 			logicName := getLogicName(r)
 			if r.Path == "/" {
 				switch r.Method {
 				case "get":
 					logicModelInterface[logicName] = spec.LogicHandle{
-						Model:    model,
-						Function: "FindOne",
-						Params:   "l.ctx,req.id",
-						Result:   "resp,err",
-						IsModel:  false,
+						Model:      model,
+						Function:   "FindOne",
+						Params:     "l.ctx,req.id",
+						Result:     "result,err",
+						ReqIsModel: false,
 					}
 				case "post":
 					logicModelInterface[logicName] = spec.LogicHandle{
-						Model:    model,
-						Function: "Insert",
-						Params:   "l.ctx",
-						Result:   "_,err",
-						IsModel:  true,
+						Model:      model,
+						Function:   "Insert",
+						Params:     "l.ctx",
+						Result:     "_,err",
+						ReqIsModel: true,
 					}
 				case "put":
 					logicModelInterface[logicName] = spec.LogicHandle{
-						Model:    model,
-						Function: "Update",
-						Params:   "l.ctx",
-						Result:   "_,err",
-						IsModel:  true,
+						Model:      model,
+						Function:   "Update",
+						Params:     "l.ctx",
+						Result:     "_,err",
+						ReqIsModel: true,
 					}
 				case "delete":
 					logicModelInterface[logicName] = spec.LogicHandle{
-						Model:    model,
-						Function: "Delete",
-						Params:   "l.ctx,req.id",
-						Result:   "_,err",
-						IsModel:  false,
+						Model:      model,
+						Function:   "Delete",
+						Params:     "l.ctx,req.id",
+						Result:     "_,err",
+						ReqIsModel: false,
 					}
+				}
+			} else {
+				logicModelInterface[logicName] = spec.LogicHandle{
+					Model:         model,
+					Function:      genLogicFunc[r.Path],
+					Params:        genLogicFuncParam[r.Path],
+					Result:        "result,err",
+					ResultIsModel: true,
 				}
 			}
 		}
