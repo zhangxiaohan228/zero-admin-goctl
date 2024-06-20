@@ -189,16 +189,13 @@ func getDoc(doc string) string {
 	return "// " + strings.Trim(doc, "\"")
 }
 
-func getModel(api *spec.ApiSpec) string {
-	result := collection.NewSet()
+func getModel(api *spec.ApiSpec) map[string]string {
+	groupModelMap := make(map[string]string)
 	for _, g := range api.Service.Groups {
 		model := g.GetAnnotation("model")
-		if len(model) > 0 {
-			for _, item := range strings.Split(model, ",") {
-				result.Add(strings.TrimSpace(item))
-				return result.KeysStr()[0]
-			}
+		if model != "" {
+			groupModelMap[g.GetAnnotation("group")] = model
 		}
 	}
-	return ""
+	return groupModelMap
 }
