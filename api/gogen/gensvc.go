@@ -26,8 +26,6 @@ func genServiceContext(dir, rootPkg string, cfg *config.Config, api *spec.ApiSpe
 	var middlewareStr string
 	var middlewareAssignment string
 	middlewares := getMiddleware(api)
-	model := getModel(api)
-	ifMysql, modelSvc := genSqlConn(model)
 
 	for _, item := range middlewares {
 		middlewareStr += fmt.Sprintf("%s rest.Middleware\n", item)
@@ -40,9 +38,6 @@ func genServiceContext(dir, rootPkg string, cfg *config.Config, api *spec.ApiSpe
 	if len(middlewareStr) > 0 {
 		configImport += "\n\t\"" + pathx.JoinPackages(rootPkg, middlewareDir) + "\""
 		configImport += fmt.Sprintf("\n\t\"%s/rest\"", vars.ProjectOpenSourceURL)
-	}
-	if model != "" {
-		configImport += "\n\t\"" + "zero-admin/server/model/model" + "\""
 	}
 
 	return genFile(fileGenConfig{
@@ -58,15 +53,6 @@ func genServiceContext(dir, rootPkg string, cfg *config.Config, api *spec.ApiSpe
 			"config":               "config.Config",
 			"middleware":           middlewareStr,
 			"middlewareAssignment": middlewareAssignment,
-			"ifMysql":              ifMysql,
-			"models":               modelSvc,
 		},
 	})
-}
-
-func genSqlConn(apiModel string) (string, string) {
-	if apiModel != "" {
-		return "\tdbSourceStr := dbSource(c.DB)\n\tsqlConn := sqlx.NewMysql(dbSourceStr)", "\t\tModels:         model.NewModel(sqlConn),"
-	}
-	return "", ""
 }
