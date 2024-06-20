@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/zhangxiaohan228/zero-admin-goctl/api/parser/g4/gen/api"
 	"github.com/zhangxiaohan228/zero-admin-goctl/api/spec"
+	"github.com/zhangxiaohan228/zero-admin-goctl/api/util"
 	"github.com/zhangxiaohan228/zero-admin-goctl/config"
 	"github.com/zhangxiaohan228/zero-admin-goctl/util/format"
 	"github.com/zhangxiaohan228/zero-admin-goctl/util/pathx"
@@ -35,11 +36,13 @@ var (
 )
 
 func genLogic(dir, rootPkg string, cfg *config.Config, api *spec.ApiSpec) error {
+	groupModel := getModel(api)
 
-	logicHandle := newLogicHandlerByMethod(getModel(api), api.Service.Groups)
 	for _, g := range api.Service.Groups {
+		serviceGroup := g.GetAnnotation("group")
+		model := groupModel[serviceGroup]
 		for _, r := range g.Routes {
-			err := genLogicByRoute(dir, rootPkg, cfg, g, r, logicHandle)
+			err := genLogicByRoute(dir, rootPkg, cfg, g, r, newLogicHandlerByMethod(util.ToCamelCase(model), api.Service.Groups))
 			if err != nil {
 				return err
 			}
