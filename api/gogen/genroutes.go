@@ -27,9 +27,21 @@ package handler
 import (
 	"net/http"{{if .hasTimeout}}
 	"time"{{end}}
-
+	pluginRouter "zero-admin/server/system/plugins/rouetrs"
 	{{.importPackages}}
 )
+
+func RegisterRouters(server *rest.Server, serverCtx *svc.ServiceContext, plugins []pluginRouter.PluginRouter) {
+
+	// 处理插件的路由注册
+	if plugins != nil {
+		for _, plugin := range plugins {
+			plugin.InitPlugin(serverCtx.Models.SysMenuModel, serverCtx.Models.PluginModel)
+			plugin.RegisterRouters()
+		}
+	}
+	RegisterHandlers(server, serverCtx)
+}
 
 func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	{{.routesAdditions}}
