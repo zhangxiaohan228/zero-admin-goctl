@@ -36,8 +36,8 @@ func RegisterRouters(server *rest.Server, serverCtx *svc.ServiceContext, plugins
 	// 处理插件的路由注册
 	if plugins != nil {
 		for _, plugin := range plugins {
-			plugin.InitPlugin(serverCtx.Models.SysMenuModel, serverCtx.Models.PluginModel)
-			plugin.RegisterRouters()
+			plugin.InitPluginMenu(serverCtx.Models.SysMenuModel)
+			plugin.RegisterRouters(serverCtx.Config.System)
 		}
 	}
 	RegisterHandlers(server, serverCtx)
@@ -127,7 +127,7 @@ func genRoutes(dir, rootPkg string, cfg *config.Config, api *spec.ApiSpec) error
 
 		var jwt string
 		if g.jwtEnabled {
-			jwt = fmt.Sprintf("\n rest.WithJwt(serverCtx.Config.%s.AccessSecret),", g.authName)
+			jwt = fmt.Sprintf("\n rest.WithJwt(serverCtx.Config.System.%s.AccessSecret),", g.authName)
 		}
 		if len(g.jwtTrans) > 0 {
 			jwt = jwt + fmt.Sprintf("\n rest.WithJwtTransition(serverCtx.Config.%s.PrevSecret,serverCtx.Config.%s.Secret),", g.jwtTrans, g.jwtTrans)
