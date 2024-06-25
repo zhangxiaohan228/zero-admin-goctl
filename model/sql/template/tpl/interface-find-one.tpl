@@ -1,1 +1,6 @@
-FindOne(ctx context.Context, {{.lowerStartCamelPrimaryKey}} {{.dataType}}) (*{{.upperStartCamelObject}}, error)
+FindOne(ctx context.Context, id int64, session ...sqlx.Session) (*{{.upperStartCamelObject}}, error)
+ConditionFindOne(ctx context.Context, rows string, where squirrel.Sqlizer) (*{{.upperStartCamelObject}}, error)
+Count(ctx context.Context, condition squirrel.Eq) (int64, error)
+IsExist(ctx context.Context, condition squirrel.Sqlizer) (bool, error)
+FindList(ctx context.Context, rows string, condition map[string]interface{}, sort ...string) ([]*{{.upperStartCamelObject}}, error)
+FindListWithPage(ctx context.Context, rows string, condition map[string]interface{}, page, pageSize uint64, sort ...string) (int64, []*{{.upperStartCamelObject}}, error)
