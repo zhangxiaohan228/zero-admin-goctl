@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/zhangxiaohan228/zero-admin-goctl/api/parser/g4/gen/api"
 	"github.com/zhangxiaohan228/zero-admin-goctl/api/spec"
-	"github.com/zhangxiaohan228/zero-admin-goctl/api/util"
 	"github.com/zhangxiaohan228/zero-admin-goctl/config"
 	"github.com/zhangxiaohan228/zero-admin-goctl/util/format"
 	"github.com/zhangxiaohan228/zero-admin-goctl/util/pathx"
@@ -42,7 +41,7 @@ func genLogic(dir, rootPkg string, cfg *config.Config, api *spec.ApiSpec) error 
 		serviceGroup := g.GetAnnotation("group")
 		model := groupModel[serviceGroup]
 		for _, r := range g.Routes {
-			err := genLogicByRoute(dir, rootPkg, cfg, g, r, newLogicHandlerByMethod(util.ToCamelCase(model), api.Service.Groups))
+			err := genLogicByRoute(dir, rootPkg, cfg, g, r, newLogicHandlerByMethod(model, api.Service.Groups))
 			if err != nil {
 				return err
 			}
@@ -59,6 +58,10 @@ func genLogicByRoute(dir, rootPkg string, cfg *config.Config, group spec.Group, 
 	}
 
 	imports := genLogicImports(route, rootPkg)
+	if logicHandle[logic].Import != "" {
+		imports += logicHandle[logic].Import
+	}
+
 	var responseString string
 	var returnString string
 	var requestString string
@@ -93,7 +96,7 @@ func genLogicByRoute(dir, rootPkg string, cfg *config.Config, group spec.Group, 
 			"request":      requestString,
 			"hasDoc":       len(route.JoinedDoc()) > 0,
 			"doc":          getDoc(route.JoinedDoc()),
-			"logicHandle":  genLogicHandle(logicHandle[logic], responseString),
+			"logicHandle":  genLogicHandle(logicHandle[logic], logic, responseString),
 		},
 	})
 }
@@ -160,7 +163,7 @@ func shallImportTypesPackage(route spec.Route) bool {
 	return true
 }
 
-func genLogicHandle(logicHandle spec.LogicHandle, responseString string) string {
+func genLogicHandle(logicHandle spec.LogicHandle, logic, responseString string) string {
 
 	if logicHandle.Model == "" {
 		return ""
@@ -169,29 +172,29 @@ func genLogicHandle(logicHandle spec.LogicHandle, responseString string) string 
 	var handles []string
 
 	modelStruct := strings.Title(logicHandle.Model) + "Model"
-	if logicHandle.ReqIsModel {
-		handles = append(handles, fmt.Sprintf("var data %s.%s", logicHandle.Model, modelStruct))
-		handles = append(handles, "copier.Copy(&data, &req)"+"\n")
-		handles = append(handles, fmt.Sprintf("%s = l.svcCtx.Models.%s.%s(l.ctx,data)", logicHandle.Result, modelStruct, logicHandle.Function))
+
+	funcResult := logicHandle.Result
+	if strings.Contains(logicHandle.Result, "_") {
+		funcResult += " = "
 	} else {
-		handles = append(handles, fmt.Sprintf("%s = l.svcCtx.Models.%s.%s(%s)", logicHandle.Result, modelStruct, logicHandle.Function, logicHandle.Params))
+		funcResult += ":="
+	}
+	if logicHandle.ReqIsModel {
+		handles = append(handles, fmt.Sprintf("var data *%s.%s", logicHandle.Model, strings.Title(logicHandle.Model)))
+		handles = append(handles, "copier.Copy(&data, &req)"+"\n")
+		handles = append(handles, fmt.Sprintf("%s l.svcCtx.Models.%s.%s(l.ctx,data)", funcResult, modelStruct, logicHandle.Function))
+	} else {
+		handles = append(handles, fmt.Sprintf("%s l.svcCtx.Models.%s.%s(%s)", funcResult, modelStruct, logicHandle.Function, logicHandle.Params))
 	}
 	handles = append(handles, fmt.Sprintf("if err != nil{\n\t\treturn nil,err\n\t}"))
 
 	if logicHandle.ResultIsModel {
-		// 分离出响应结构体名称
 		parts := strings.SplitN(responseString, "*", 2)
 		typeName := strings.SplitN(parts[1], ", ", 2)[0]
 		handles = append(handles, fmt.Sprintf("resp = &%s{}", typeName))
 
-		// 需要复制结构体
 		if genLogicFuncResult[logicHandle.Function] {
-			// 截取类型内部结构体名称
-			startIndex := strings.LastIndex(typeName, "List")
-			lastIndex := strings.LastIndex(typeName, "Response")
-			typeInfoName := typeName[startIndex+4 : lastIndex]
-
-			handles = append(handles, fmt.Sprintf("var data []*types.%s", typeInfoName+"List"))
+			handles = append(handles, fmt.Sprintf("var data []*types.%s", logic[:strings.Index(logic, "Logic")]))
 			handles = append(handles, "copier.Copy(&data, &result)"+"\n")
 			handles = append(handles, "resp.List = data")
 		} else {
@@ -225,9 +228,10 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 					logicModelInterface[logicName] = spec.LogicHandle{
 						Model:      model,
 						Function:   "FindOne",
-						Params:     "l.ctx,req.id",
+						Params:     "l.ctx,req.Id",
 						Result:     "result,err",
 						ReqIsModel: false,
+						Import:     "\n\"github.com/jinzhu/copier\"\n",
 					}
 				case "post":
 					logicModelInterface[logicName] = spec.LogicHandle{
@@ -236,6 +240,7 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 						Params:     "l.ctx",
 						Result:     "_,err",
 						ReqIsModel: true,
+						Import:     fmt.Sprintf("\n\"github.com/jinzhu/copier\"\n\t \"zero-admin/server/model/%s\"", model),
 					}
 				case "put":
 					logicModelInterface[logicName] = spec.LogicHandle{
@@ -244,12 +249,13 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 						Params:     "l.ctx",
 						Result:     "_,err",
 						ReqIsModel: true,
+						Import:     fmt.Sprintf("\n\"github.com/jinzhu/copier\"\n\t \"zero-admin/server/model/%s\"", model),
 					}
 				case "delete":
 					logicModelInterface[logicName] = spec.LogicHandle{
 						Model:      model,
 						Function:   "Delete",
-						Params:     "l.ctx,req.id",
+						Params:     "l.ctx,req.Id",
 						Result:     "_,err",
 						ReqIsModel: false,
 					}
@@ -261,6 +267,7 @@ func newLogicHandlerByMethod(model string, apiGroups []spec.Group) map[string]sp
 					Params:        genLogicFuncParam[r.Path],
 					Result:        "result,err",
 					ResultIsModel: true,
+					Import:        "\n\"github.com/jinzhu/copier\"\n",
 				}
 			}
 		}
