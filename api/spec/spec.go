@@ -154,5 +154,6 @@ type (
 		Params        string // Model接口参数
 		ReqIsModel    bool   // 参数是否为model结构体
 		ResultIsModel bool   // 结果是否为model结构体
+		Import        string // 需要额外引入的依赖
 	}
 )
